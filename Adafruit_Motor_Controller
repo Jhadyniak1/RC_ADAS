@@ -36,3 +36,7 @@ void loop() {
   leftMotor->run(FORWARD); //LEFT MOTOR FULL STEAM AHEAD!
   rightMotor->run(FORWARD); //RIGHT MOTOR FULL STEAM AHEAD!
 }
+
+
+leftMotor->run(RELEASE);
+rightMotor->run(RELEASE);

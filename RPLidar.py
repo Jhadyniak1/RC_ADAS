@@ -1,9 +1,8 @@
 ## install dependencies via terminal on raspi
-pip install adafruit-circuitpython-rplidar
+#pip install adafruit-circuitpython-rplidar
 ### https://learn.adafruit.com/slamtec-rplidar-on-pi/cpython-on-raspberry-pi
 import os
 from math import cos, sin, pi, floor
-import pygame
 from adafruit_rplidar import RPLidar
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +10,7 @@ import numpy as np
 
 # Setup the RPLidar
 PORT_NAME = '/dev/ttyUSB0'
-lidar = RPLidar(None, PORT_NAME)
+lidar = RPLidar(None, PORT_NAME, BAUDRATE = 115200)
 
 # used to scale data to fit on the screen
 max_distance = 0
@@ -26,8 +25,8 @@ try:
 
 except KeyboardInterrupt:
     print('Stoping.')
-lidar.stop()
-lidar.disconnect()
+    lidar.stop()
+    lidar.disconnect()
 
 
 def process_data(data):

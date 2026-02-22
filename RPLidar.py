@@ -4,6 +4,7 @@
 import os
 from math import cos, sin, pi, floor
 from adafruit_rplidar import RPLidar
+import time 
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -11,7 +12,7 @@ import numpy as np
 # Setup the RPLidar
 PORT_NAME = '/dev/ttyUSB0'
 lidar = RPLidar(None, PORT_NAME, BAUDRATE = 115200)
-
+time.sleep(2)
 # used to scale data to fit on the screen
 max_distance = 0
 scan_data = [0]*360

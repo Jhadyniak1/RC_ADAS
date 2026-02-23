@@ -1,3 +1,13 @@
+#for use on raspberru pi, the below commented out commands are to be run from terminal prior to trying to execute the program
+############################
+#sudo apt update
+#sudo apt install python3-venv
+#python3 -m venv venv
+#source venv/bin/activate
+#pip install rplidar-roboticia
+#pip install numpy
+#pip install matplotlib
+#############################
 from rplidar import RPLidar, RPLidarException
 import time
 import numpy as np

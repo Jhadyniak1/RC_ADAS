@@ -52,11 +52,11 @@ def main():
             print("No commands received.\n")
         
         if mode == 1:
-            ser.write(b'1'\n)
+            ser.write(b"1")
         if mode == 2:
-            ser.write(b'2'\n)
+            ser.write(b"2")
         if mode == 3:
-            ser.write(b'3'\n)
+            ser.write(b"3")
         sleep(0.5)
             
 if __name__ == "__main__":

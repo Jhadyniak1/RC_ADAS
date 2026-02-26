@@ -41,15 +41,23 @@ def get_next_event(dev):
     		return event
 
 def main():
+    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+    sleep(2)
+    device = get_ir_device()
     while True:
-        device = get_ir_device()
         mode = get_last_event(device)
         if mode is not None:
             print("Received command:", mode.value, "\n")
-            
         else:
             print("No commands received.\n")
+        
+        if mode == 1:
+            ser.write(b'1'\n)
+        if mode == 2:
+            ser.write(b'2'\n)
+        if mode == 3:
+            ser.write(b'3'\n)
         sleep(0.5)
-
+            
 if __name__ == "__main__":
     main()

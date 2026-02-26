@@ -51,11 +51,21 @@ def main():
         else:
             print("No commands received.\n")
         
-        if mode == 1:
+        if mode == 1: # Lane keep!
             ser.write(b"1")
-        if mode == 2:
+        if mode == 2: # Object avoidance 
             ser.write(b"2")
-        if mode == 3:
+        if mode == 3: # Object detection 
+            ser.write(b"3")
+        if mode == 4: # Adaptive cruise
+            ser.write(b"3")
+        if mode == 5: # Forward key
+            ser.write(b"3")
+        if mode == 6: # Backward key
+            ser.write(b"3")
+        if mode == 7: # Left key
+            ser.write(b"3")
+        if mode == 8: # Right key
             ser.write(b"3")
         sleep(0.5)
             

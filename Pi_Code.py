@@ -3,7 +3,7 @@
 #!/usr/bin/python
 import evdev
 from time import sleep
-
+import serial
 # returns path of gpio ir receiver device
 def get_ir_device():
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
@@ -41,7 +41,7 @@ def get_next_event(dev):
     		return event
 
 def main():
-    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)
+    ser = serial.Serial('/dev/ttyS0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port'
     sleep(2)
     device = get_ir_device()
     while True:

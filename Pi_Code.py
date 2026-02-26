@@ -43,7 +43,12 @@ def get_next_event(dev):
 def main():
     device = get_ir_device()
     mode = get_last_event(device)
-    print("Received command:", mode.value, "\n")
+    if mode is not None:
+        print("Received command:", mode.value, "\n")
+        
+    else:
+        print("No commands received.\n")
+        
 
 if __name__ == "__main__":
     main()

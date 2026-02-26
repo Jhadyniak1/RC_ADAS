@@ -49,7 +49,7 @@ def main():
             
         else:
             print("No commands received.\n")
-            
+        sleep(0.5)
 
 if __name__ == "__main__":
     main()

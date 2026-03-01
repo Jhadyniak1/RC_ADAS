@@ -74,6 +74,7 @@ def main():
         
         if mode.value == 69: # Lane keep!
             message = f"{5},{255}\n"
+            print("Lane keep mode")
             ser.write(message.encode('utf-8'))
         if mode.value == 70: # Object avoidance 
             message = f"{5},{125}\n"
@@ -97,6 +98,7 @@ def main():
             message = f"{11},{255}\n"
             ser.write(message.encode('utf-8'))
         if mode == 13: #Pound sign
+            print("Shutting down")
             sys.exit()
         sleep(0.5)
             

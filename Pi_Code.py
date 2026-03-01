@@ -1,5 +1,7 @@
 #source env/bin/activate
-
+#https://ignorantofthings.com/receiving-infrared-on-the-raspberry-pi-with-python/
+#sudo ir-keytable -p all (to enable all protocols)
+#sudo ir-keytable -t (to test)
 #!/usr/bin/python
 import evdev
 from time import sleep
@@ -39,7 +41,26 @@ def get_next_event(dev):
     	event = dev.read_one()
     	if (event):
     		return event
-
+'''
+Key, Hex, Dec
+1 = 0x45, 69
+2 = 0x46, 70
+3 = 0x47, 71
+4 = 0x44, 68
+5 = 0x40, 64
+6 = 0x43, 67
+7 = 0x07, 7
+8 = 0x15, 21
+9 = 0x09, 9
+0 = 0x19, 25
+UP = 0x18, 24
+LEFT = 0x08, 8
+DOWN = 0x52, 82
+RIGHT = 0x5a, 90
+OK = 0x1c, 28
+STAR = 0x16, 22
+POUND = 0x0d, 13
+'''
 def main():
     ser = serial.Serial('/dev/ttyS0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port'
     sleep(2)
@@ -51,22 +72,32 @@ def main():
         else:
             print("No commands received.\n")
         
-        if mode == 1: # Lane keep!
-            ser.write(b"1")
-        if mode == 2: # Object avoidance 
-            ser.write(b"2")
-        if mode == 3: # Object detection 
-            ser.write(b"3")
-        if mode == 4: # Adaptive cruise
-            ser.write(b"3")
-        if mode == 5: # Forward key
-            ser.write(b"3")
-        if mode == 6: # Backward key
-            ser.write(b"3")
-        if mode == 7: # Left key
-            ser.write(b"3")
-        if mode == 8: # Right key
-            ser.write(b"3")
+        if mode == 69: # Lane keep!
+            message = f"{5},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 70: # Object avoidance 
+            message = f"{5},{125}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 71: # Object detection 
+            message = f"{6},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 68: # Adaptive cruise
+            message = f"{10},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 24: # Up key
+            message = f"{11},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 82: # Down key
+           message = f"{11},{255}\n"
+           ser.write(message.encode('utf-8'))
+        if mode == 8: # Left key
+            message = f"{11},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 90: # Right key
+            message = f"{11},{255}\n"
+            ser.write(message.encode('utf-8'))
+        if mode == 13: #Pound sign
+            sys.exit()
         sleep(0.5)
             
 if __name__ == "__main__":

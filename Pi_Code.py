@@ -30,7 +30,7 @@ def get_last_event(dev):
             if (event.value > 0):
                 last_event = event
     except BlockingIOError: # no events to be read
-        last_event = None
+        last_event = 0
 
     return last_event
 

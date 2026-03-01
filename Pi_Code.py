@@ -72,10 +72,10 @@ def main():
         else:
             print("No commands received.\n")
         
-        if mode == 69: # Lane keep!
+        if mode.value == 69: # Lane keep!
             message = f"{5},{255}\n"
             ser.write(message.encode('utf-8'))
-        if mode == 70: # Object avoidance 
+        if mode.value == 70: # Object avoidance 
             message = f"{5},{125}\n"
             ser.write(message.encode('utf-8'))
         if mode == 71: # Object detection 

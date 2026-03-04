@@ -44,7 +44,7 @@ draw.text(
     font=font,
     fill=255,
 )
-
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/
 # returns path of gpio ir receiver device
 def get_ir_device():
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
@@ -80,6 +80,41 @@ def get_next_event(dev):
     	event = dev.read_one()
     	if (event):
     		return event
+            
+def update_controls(throttle,steering):
+    controls = f"{throttle},{steering}\n"
+    ser.write(controls.encode('utf-8'))
+    return 0
+
+def update_display(mode, throttle, steering):
+    oled.fill(0)
+    oled.show()
+    text1 = "Mode:" + mode
+    draw.text(
+                (0, 15),
+                text1,
+                font=font,
+                fill=255)
+    text2 = "Throttle: " + str(throttle)
+    draw.text(
+                (0, 35),
+                text2,
+                font=font,
+                fill=255)
+    text3 = "Steering: " + str(steering)
+    draw.text(
+        (0, 45),
+        text3,
+        font=font,
+        fill=255)
+    # Display image
+    oled.image(image)
+    oled.show()
+
+
+
+
+
 '''
 Key, Hex, Dec
 1 = 0x45, 69
@@ -103,7 +138,7 @@ POUND = 0x0d, 13
 throttle = 0
 steering = 0
 def main():
-    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
+    #ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
     sleep(2)
     device = get_ir_device()
     while True:
@@ -116,8 +151,8 @@ def main():
                 steering = 255 #need to be changed by the algorithm
                 controls = f"{throttle},{steering}\n"
                 print("Lane keep mode")
-                ser.write(controls.encode('utf-8'))
                 mode_message = "Lane keep"
+                
                 
             elif mode.value == 70: # Object avoidance 
                 throttle = 5 #need to be changed by the algorithm
@@ -162,33 +197,12 @@ def main():
             elif mode.value == 13: #Pound sign
                 print("Shutting down")
                 sys.exit()
-                
+            
             else:  #Unknown command
                 print("Unrecognized command")
-        
-        text1 = "Mode:" + mode_message
-        draw.text(
-            (0, 15),
-            text1,
-            font=font,
-            fill=255)
-        text2 = "Throttle: " + throttle
-        draw.text(
-            (0, 35),
-            text2,
-            font=font,
-            fill=255)
-        text3 = "Steering: " + steering
-        draw.text(
-            (0, 45),
-            text3,
-            font=font,
-            fill=255)
-        # Display image
-        oled.image(image)
-        oled.show()
-        else:
-            print("No commands received.\n")
-        sleep(0.5)
+            update_controls(throttle, steering)
+            update_display(mode_message, throttle, steering)
+            
+    sleep(0.5)
 if __name__ == "__main__":
     main()

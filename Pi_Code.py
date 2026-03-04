@@ -37,13 +37,7 @@ draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
 # Load default font.
 font = ImageFont.load_default(size = 14) ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
 #font1 = ImageFont.load("arial.pil")
-text = "ECE 4415 Group 4"
-draw.text(
-    (0, 0),
-    text,
-    font=font,
-    fill=255,
-)
+
 ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/
 # returns path of gpio ir receiver device
 def get_ir_device():
@@ -87,8 +81,15 @@ def update_controls(throttle,steering):
     return 0
 
 def update_display(mode, throttle, steering):
-    oled.fill(0)
-    oled.show()
+    draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
+    text = "ECE 4415 Group 4"
+    draw.text(
+    (0, 0),
+    text,
+    font=font,
+    fill=255,
+)
+   
     text1 = "Mode:" + mode
     draw.text(
                 (0, 15),

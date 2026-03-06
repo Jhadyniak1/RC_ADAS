@@ -58,11 +58,9 @@ def get_ir_device():
     sys.exit()
 
 
-# returns a generator object that yields InputEvent instances
 # raises BlockingIOError if no events available, which must be caught
 def get_all_events(dev):
     return dev.read()
-
 
 # returns the most recent InputEvent instance
 # returns NoneType if no events available
@@ -76,21 +74,17 @@ def get_last_event(dev):
 
     return last_event
 
-
-# returns the next InputEvent instance
-# blocks until event is available
+# returns the next InputEvent instance //// blocks until event is available
 def get_next_event(dev):
     while(True):
         event = dev.read_one()
         if (event):
             return event
 
-
 def update_controls(throttle, steering):
     controls = f"{throttle},{steering}\n"
     ser.write(controls.encode('utf-8'))
     return 0
-
 
 def update_display(mode, throttle, steering):
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
@@ -105,7 +99,6 @@ def update_display(mode, throttle, steering):
     # Display image
     oled.image(image)
     oled.show()
-
 
 '''
 Key, Hex, Dec
@@ -128,7 +121,6 @@ STAR = 0x16, 22
 POUND = 0x0d, 13
 '''
 
-
 def adaptive_thresholding(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -136,13 +128,11 @@ def adaptive_thresholding(frame):
                                    cv2.THRESH_BINARY_INV, 11, 2)
     return binary
 
-
 def preprocess_image(frame):
     masked = adaptive_thresholding(frame)
     blur = cv2.GaussianBlur(masked, (5, 5), 1)
     edges = cv2.Canny(blur, 50, 150)
     return edges
-
 
 def detect_lanes(frame):
     edges = preprocess_image(frame)
@@ -166,9 +156,7 @@ def detect_lanes(frame):
     detected_center = int((left_center + right_center) / 2) if left_center and right_center else lane_center
     return frame, lane_center, detected_center
 
-
 # need to add dynamic steering not step steering
-
 def lane_keep():
     picam2 = Picamera2()
     picam2.start()

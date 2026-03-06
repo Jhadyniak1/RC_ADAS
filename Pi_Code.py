@@ -208,7 +208,6 @@ def adaptive_cruise():
 throttle = 0
 steering = 0
 def main():
-    #ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
     sleep(2)
     device = get_ir_device()
     while True:
@@ -220,7 +219,6 @@ def main():
                 {throttle, steering} = lane_keep()
                 print("Lane keep mode")
                 mode_message = "Lane keep"
-                
                 
             elif mode.value == 70: # Object avoidance (key number 2)
                 {throttle, steering} = object_avoidance()

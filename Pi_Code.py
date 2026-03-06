@@ -4,6 +4,7 @@
 #sudo ir-keytable -t (to test)
 #!/usr/bin/python
 
+import sys  # FIX 2: Added missing sys import
 import evdev
 from time import sleep
 import serial
@@ -20,6 +21,7 @@ from picamera2 import Picamera2
 import numpy as np
 import cv2
 import RPi.GPIO as GPIO
+
 WIDTH = 128
 HEIGHT = 64  # Change to 64 if needed
 BORDER = 5
@@ -38,10 +40,12 @@ draw = ImageDraw.Draw(image)
 # Draw a white background
 draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
 # Load default font.
-font = ImageFont.load_default(size = 14) ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
+font = ImageFont.load_default(size=14)  ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
 #font1 = ImageFont.load("arial.pil")
 
-ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1) #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)  #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
+
+
 # returns path of gpio ir receiver device
 def get_ir_device():
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
@@ -53,35 +57,40 @@ def get_ir_device():
     print("No device found!")
     sys.exit()
 
+
 # returns a generator object that yields InputEvent instances
-# raises BlockingIOError if no events available, which much be caught
+# raises BlockingIOError if no events available, which must be caught
 def get_all_events(dev):
     return dev.read()
+
 
 # returns the most recent InputEvent instance
 # returns NoneType if no events available
 def get_last_event(dev):
     try:
-        for event in dev.read():	# iterate through all queued events
+        for event in dev.read():  # iterate through all queued events
             if (event.value > 0):
                 last_event = event
-    except BlockingIOError: # no events to be read
+    except BlockingIOError:  # no events to be read
         last_event = None
 
     return last_event
+
 
 # returns the next InputEvent instance
 # blocks until event is available
 def get_next_event(dev):
     while(True):
-    	event = dev.read_one()
-    	if (event):
-    		return event
-            
-def update_controls(throttle,steering):
+        event = dev.read_one()
+        if (event):
+            return event
+
+
+def update_controls(throttle, steering):
     controls = f"{throttle},{steering}\n"
     ser.write(controls.encode('utf-8'))
     return 0
+
 
 def update_display(mode, throttle, steering):
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
@@ -96,6 +105,7 @@ def update_display(mode, throttle, steering):
     # Display image
     oled.image(image)
     oled.show()
+
 
 '''
 Key, Hex, Dec
@@ -126,18 +136,20 @@ def adaptive_thresholding(frame):
                                    cv2.THRESH_BINARY_INV, 11, 2)
     return binary
 
+
 def preprocess_image(frame):
     masked = adaptive_thresholding(frame)
     blur = cv2.GaussianBlur(masked, (5, 5), 1)
     edges = cv2.Canny(blur, 50, 150)
     return edges
 
+
 def detect_lanes(frame):
     edges = preprocess_image(frame)
     lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 20, minLineLength=30, maxLineGap=10)
     lane_center = frame.shape[1] // 2
     left_lane, right_lane = [], []
-    
+
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
@@ -148,39 +160,38 @@ def detect_lanes(frame):
             elif slope > 0.2:
                 right_lane.append((x1 + x2) // 2)
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
-    
+
     left_center = np.mean(left_lane) if left_lane else None
     right_center = np.mean(right_lane) if right_lane else None
-    detected_center = int((left_center + right_center) / 2) if left_center and right_center else lane_center #lane_center
+    detected_center = int((left_center + right_center) / 2) if left_center and right_center else lane_center
     return frame, lane_center, detected_center
 
 
-#need to add dynamic steering not step steering
+# need to add dynamic steering not step steering
 
 def lane_keep():
     picam2 = Picamera2()
     picam2.start()
     i = 0
-    while i<10:
+    throttle = 0  # initialise with safe defaults
+    steering = 0
+    while i < 10:
         frame = picam2.capture_array()
         lane_frame, lane_center, detected_center = detect_lanes(frame)
         error = lane_center - detected_center
-         if error > 20:
-            #PWM.set_motor_model(1500, 1500, -400, -400)
+        if error > 20:  # FIX 3: Removed extra leading space (indentation error)
             throttle = 100
-            steering = 50 #not sure if needs to be positive or negative
+            steering = 50  # not sure if needs to be positive or negative
         elif error < -20:
-            #PWM.set_motor_model(-400, -400, 1500, 1500)
             throttle = 100
-            steering = -50 
+            steering = -50
         else:
-            #PWM.set_motor_model(500, 500, 500, 500)
             throttle = 100
-            steering = 0 
+            steering = 0
 
         cv2.imshow("Lane Detection", lane_frame)
         print(f"Lane Error: {error}")
-        
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         time.sleep(0.1)
@@ -188,25 +199,25 @@ def lane_keep():
     picam2.stop()
     cv2.destroyAllWindows()
 
-    return throttle, steering 
+    return throttle, steering  # FIX 1: Was using set syntax {throttle, steering}
+
 
 def object_avoidance():
+    return throttle, steering
 
-
-    return throttle, steering 
 
 def object_detection():
+    return throttle, steering
 
-
-    return throttle, steering 
 
 def adaptive_cruise():
+    return throttle, steering
 
-
-    return throttle, steering 
 
 throttle = 0
 steering = 0
+
+
 def main():
     sleep(2)
     device = get_ir_device()
@@ -214,58 +225,60 @@ def main():
         mode = get_last_event(device)
         if mode is not None:
             print("Received command:", mode.value, "\n")
-        
-            if mode.value == 69: # Lane keep (key number 1)
-                {throttle, steering} = lane_keep()
+            mode_message = "Unknown"  # FIX 5: Initialise mode_message before the if/elif chain
+
+            if mode.value == 69:  # Lane keep (key number 1)
+                throttle, steering = lane_keep()  # FIX 1: Was {throttle, steering}
                 print("Lane keep mode")
                 mode_message = "Lane keep"
-                
-            elif mode.value == 70: # Object avoidance (key number 2)
-                {throttle, steering} = object_avoidance()
+
+            elif mode.value == 70:  # Object avoidance (key number 2)
+                throttle, steering = object_avoidance()  # FIX 1: Was {throttle, steering}
                 print("Object avoidance mode")
                 mode_message = "Object Avoidance"
-                
-            elif mode.value == 71: # Object detection (key number 3)
-                {throttle, steering} = object_detection()
-                print("Object avoidance mode")
+
+            elif mode.value == 71:  # Object detection (key number 3)
+                throttle, steering = object_detection()  # FIX 1: Was {throttle, steering}
+                print("Object detection mode")
                 mode_message = "Object Detection"
-                
-            elif mode.value == 68: # Adaptive cruise (key number 4)
-                {throttle, steering} = adaptive_cruise()
-                controls = f"{throttle},{steering}\n"
-                ser.write(controls.encode('utf-8'))
+
+            elif mode.value == 68:  # Adaptive cruise (key number 4)
+                throttle, steering = adaptive_cruise()  # FIX 1: Was {throttle, steering}
+                # FIX 8: Removed duplicate ser.write() call here; update_controls() below handles it
                 mode_message = "Adaptive cruise"
-                
-            elif mode.value == 24: # Up key
-                throttle = 150 
-                steering = 0 
+
+            elif mode.value == 24:  # Up key
+                throttle = 150
+                steering = 0
                 mode_message = "Drive forward"
-                
-            elif mode.value == 82: # Down key
-                throttle = -150 
-                steering = 0 
+
+            elif mode.value == 82:  # Down key
+                throttle = -150
+                steering = 0
                 mode_message = "Drive back"
-                
-            elif mode.value == 8: # Left key
-                throttle = 100 
+
+            elif mode.value == 8:  # Left key
+                throttle = 100
                 steering = -50
                 mode_message = "Steer left"
-            
-            elif mode.value == 90: # Right key
-                throttle = 100 
-                steering = -50
+
+            elif mode.value == 90:  # Right key
+                throttle = 100
+                steering = 50  # FIX 4: Was -50, same as left — corrected to +50
                 mode_message = "Steer right"
 
-            elif mode.value == 13: #Pound sign
+            elif mode.value == 13:  # Pound sign
                 print("Shutting down")
                 sys.exit()
-            
-            else:  #Unknown command
+
+            else:  # Unknown command
                 print("Unrecognized command")
 
             update_controls(throttle, steering)
             update_display(mode_message, throttle, steering)
-            
-    sleep(0.5)
+
+        sleep(0.5)  # FIX 7: Moved inside while loop so it actually delays each iteration
+
+
 if __name__ == "__main__":
     main()

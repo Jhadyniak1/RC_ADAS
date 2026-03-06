@@ -1,7 +1,5 @@
 // ============================================================
 //  4WD Differential Steering — Adafruit Motor Shield v2
-//  Arduino Uno / Nano
-//
 //  Wiring:
 //    Left  Front motor  → M1
 //    Left  Rear  motor  → M2
@@ -179,14 +177,13 @@ void drive(int throttle, int steering) {
 
 
 void setup() {
-  Serial.begin(9600);
-    Serial.println("4WD Motor Shield v2 — Starting...");
+Serial.begin(9600);
+Serial.println("4WD Motor Shield v2 — Starting...");
 
- /// if (!AFMS.begin()) {
-  ///  Serial.println("ERROR: Motor Shield not found. Check wiring/I2C address.");
-   /// while (true); // halt
+if (!AFMS.begin()) {
+Serial.println("ERROR: Motor Shield not found. Check wiring/I2C address.");
+delay(1000);
   }
-
   Serial.println("Motor Shield OK.");
 }
 
@@ -194,17 +191,14 @@ int speed = 0;
 int direction = 0;
 void loop() {
  
- // If the Pi sends something, read and echo it back
-  if (Serial.available()) {
-      String data = Serial.readStringUntil('\n');  // read until newline
-
-        int commaIndex = data.indexOf(',');          // find the comma
-
-        if (commaIndex != -1) {
-            value1 = data.substring(0, commaIndex).toInt();
-            value2 = data.substring(commaIndex + 1).toInt();
+// If the Pi sends something, read 
+if (Serial.available()) {
+String data = Serial.readStringUntil('\n');  // read until newline
+int commaIndex = data.indexOf(',');          // find the comma
+if (commaIndex != -1) {
+int throttle = data.substring(0, commaIndex).toInt();
+int steering = data.substring(commaIndex + 1).toInt();
   }
- analogWrite(value1,value2);
-///  drive(speed, direction)
-
+drive(throttle, steering)
+}
 }

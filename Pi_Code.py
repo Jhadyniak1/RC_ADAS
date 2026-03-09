@@ -82,9 +82,10 @@ def get_next_event(dev):
             return event
 
 def update_controls(throttle, steering):
-    controls = f"{throttle},{steering}\n"
-    ser.write(controls.encode('utf-8'))
+    controls = 
+    ser.write(f'{throttle},{steering}\n'.encode())
     return 0
+
 
 def update_display(mode, throttle, steering):
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)

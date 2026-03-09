@@ -82,7 +82,6 @@ def get_next_event(dev):
             return event
 
 def update_controls(throttle, steering):
-    controls = 
     ser.write(f'{throttle},{steering}\n'.encode())
     return 0
 

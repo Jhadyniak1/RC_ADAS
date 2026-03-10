@@ -199,8 +199,6 @@ if (commaIndex != -1) {
 throttle = data.substring(0, commaIndex).toInt();
 steering = data.substring(commaIndex + 1).toInt();
   }
-Serial.print("Got: ");
-Serial.println(data);  // echo back what it received
 }
 drive(throttle, steering);
 

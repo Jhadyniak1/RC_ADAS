@@ -87,7 +87,7 @@ if __name__ == "__main__":
     while True:
         success, img = cap.read()
 #Below provides a huge amount of controll. the 0.45 number is the threshold number, the 0.2 number is the nms number)
-        result, objectInfo = getObjects(img,0.45,0.2)
+        result, objectInfo = getObjects(img,0.45,0.2, objects = ['stop sign', 'xxx'])
         #print(objectInfo)
         cv2.imshow("Output",img)
         cv2.waitKey(1)

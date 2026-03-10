@@ -187,8 +187,8 @@ delay(1000);
   Serial.println("Motor Shield OK.");
 }
 
-int speed = 0;
-int direction = 0;
+int throttle = 0;
+int steering = 0;
 void loop() {
  
 // If the Pi sends something, read 
@@ -196,9 +196,12 @@ if (Serial.available()) {
 String data = Serial.readStringUntil('\n');  // read until newline
 int commaIndex = data.indexOf(',');          // find the comma
 if (commaIndex != -1) {
-int throttle = data.substring(0, commaIndex).toInt();
-int steering = data.substring(commaIndex + 1).toInt();
+throttle = data.substring(0, commaIndex).toInt();
+steering = data.substring(commaIndex + 1).toInt();
   }
-drive(throttle, steering)
+Serial.print("Got: ");
+Serial.println(data);  // echo back what it received
 }
+drive(throttle, steering);
+
 }

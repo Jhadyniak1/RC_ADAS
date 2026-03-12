@@ -154,7 +154,13 @@ def detect_lanes(frame):
     right_center = np.mean(right_lane) if right_lane else None
     detected_center = int((left_center + right_center) / 2) if left_center and right_center else lane_center
     return frame, lane_center, detected_center
-
+picam2 = Picamera2()
+config = picam2.create_preview_configuration(
+    main={"size": (640, 480), "format": "RGB888"}
+)
+picam2.configure(config)
+picam2.start()
+sleep(2)
 # need to add dynamic steering not step steering
 def lane_keep():
     throttle = 0  # initialise with safe defaults
@@ -175,10 +181,8 @@ def lane_keep():
     cv2.imshow("Lane Detection", lane_frame)
     print(f"Lane Error: {error}")
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-    time.sleep(0.1)
-    return throttle, steering  # FIX 1: Was using set syntax {throttle, steering}
+    sleep(0.2)
+    return throttle, steering, frame  
 
 
 def object_avoidance():
@@ -199,8 +203,8 @@ steering = 0
 
 def main():
     update_controls(0,0)
-    picam2 = Picamera2()
-    picam2.start()
+    #picam2 = Picamera2()
+   # picam2.start()
     sleep(2)
     device = get_ir_device()
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
@@ -210,15 +214,19 @@ def main():
     oled.image(image)
     oled.show()
     while True:
-        mode = get_last_event(device)
-        if mode is not None:
+        key = get_last_event(device)
+        if key is not None:
+            mode = key
             print("Received command:", mode.value, "\n")
             mode_message = "Unknown"  # FIX 5: Initialise mode_message before the if/elif chain
 
             if mode.value == 69:  # Lane keep (key number 1)
-                throttle, steering = lane_keep()  #
+                throttle, steering, frame = lane_keep()  #
                 print("Lane keep mode")
                 mode_message = "Lane keep"
+                cv2.imshow("Lane keep", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
             elif mode.value == 70:  # Object avoidance (key number 2)
                 throttle, steering = object_avoidance() 
@@ -264,6 +272,7 @@ def main():
             elif mode.value == 13:  # Pound sign
                 print("Shutting down")
                 picam2.stop()
+                picam2.close()
                 cv2.destroyAllWindows()
                 update_controls(0, 0)
                 update_display("Shutdown", 0, 0)

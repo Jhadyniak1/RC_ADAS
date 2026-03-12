@@ -4,7 +4,7 @@
 #sudo ir-keytable -t (to test)
 #!/usr/bin/python
 
-import sys  # FIX 2: Added missing sys import
+import sys  
 import evdev
 from time import sleep
 import serial
@@ -23,7 +23,7 @@ import cv2
 import RPi.GPIO as GPIO
 
 WIDTH = 128
-HEIGHT = 64  # Change to 64 if needed
+HEIGHT = 64  
 BORDER = 5
 i2c = board.I2C()  # uses board.SCL and board.SDA
 oled = adafruit_ssd1306.SSD1306_I2C(WIDTH, HEIGHT, i2c, addr=0x3C)
@@ -40,11 +40,10 @@ draw = ImageDraw.Draw(image)
 # Draw a white background
 draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
 # Load default font.
-font = ImageFont.load_default(size=14)  ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
+font = ImageFont.load_default()  ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
 #font1 = ImageFont.load("arial.pil")
 
-ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)  #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
-
+ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)  #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
 
 # returns path of gpio ir receiver device
 def get_ir_device():
@@ -207,8 +206,15 @@ steering = 0
 
 
 def main():
+    update_controls(0,0)
     sleep(2)
     device = get_ir_device()
+    draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
+    text = "Waiting for input....."
+    draw.text((0, 0), text, font=font, fill=255)
+    # Display image
+    oled.image(image)
+    oled.show()
     while True:
         mode = get_last_event(device)
         if mode is not None:
@@ -216,57 +222,67 @@ def main():
             mode_message = "Unknown"  # FIX 5: Initialise mode_message before the if/elif chain
 
             if mode.value == 69:  # Lane keep (key number 1)
-                throttle, steering = lane_keep()  # FIX 1: Was {throttle, steering}
+                throttle, steering = lane_keep()  #
                 print("Lane keep mode")
                 mode_message = "Lane keep"
 
             elif mode.value == 70:  # Object avoidance (key number 2)
-                throttle, steering = object_avoidance()  # FIX 1: Was {throttle, steering}
+                throttle, steering = object_avoidance() 
                 print("Object avoidance mode")
                 mode_message = "Object Avoidance"
 
             elif mode.value == 71:  # Object detection (key number 3)
-                throttle, steering = object_detection()  # FIX 1: Was {throttle, steering}
+                throttle, steering = object_detection()  
                 print("Object detection mode")
                 mode_message = "Object Detection"
 
             elif mode.value == 68:  # Adaptive cruise (key number 4)
-                throttle, steering = adaptive_cruise()  # FIX 1: Was {throttle, steering}
-                # FIX 8: Removed duplicate ser.write() call here; update_controls() below handles it
+                throttle, steering = adaptive_cruise()  
                 mode_message = "Adaptive cruise"
 
             elif mode.value == 24:  # Up key
-                throttle = 150
+                throttle = 50
                 steering = 0
                 mode_message = "Drive forward"
 
             elif mode.value == 82:  # Down key
-                throttle = -150
+                throttle = -50
                 steering = 0
                 mode_message = "Drive back"
 
             elif mode.value == 8:  # Left key
-                throttle = 100
+                throttle = 50
                 steering = -50
                 mode_message = "Steer left"
 
             elif mode.value == 90:  # Right key
-                throttle = 100
-                steering = 50  # FIX 4: Was -50, same as left — corrected to +50
+                throttle = 50
+                steering = 50  
                 mode_message = "Steer right"
+
+            elif mode.value == 28:  # OK
+                print("HALT")
+                throttle = 0
+                steering = 0
+                mode_message = "HALT"
+
 
             elif mode.value == 13:  # Pound sign
                 print("Shutting down")
+                update_controls(0, 0)
+                update_display("Shutdown", 0, 0)
                 sys.exit()
 
             else:  # Unknown command
+                update_controls(0, 0)
+                update_display("Invalid input", 0, 0)
                 print("Unrecognized command")
 
             update_controls(throttle, steering)
             update_display(mode_message, throttle, steering)
 
-        sleep(0.5)  # FIX 7: Moved inside while loop so it actually delays each iteration
-
+        
 
 if __name__ == "__main__":
     main()
+

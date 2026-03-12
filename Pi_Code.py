@@ -157,35 +157,27 @@ def detect_lanes(frame):
 
 # need to add dynamic steering not step steering
 def lane_keep():
-    picam2 = Picamera2()
-    picam2.start()
-    i = 0
     throttle = 0  # initialise with safe defaults
     steering = 0
-    while i < 10:
-        frame = picam2.capture_array()
-        lane_frame, lane_center, detected_center = detect_lanes(frame)
-        error = lane_center - detected_center
-        if error > 20:  # FIX 3: Removed extra leading space (indentation error)
-            throttle = 100
-            steering = 50  # not sure if needs to be positive or negative
-        elif error < -20:
-            throttle = 100
-            steering = -50
-        else:
-            throttle = 100
-            steering = 0
+    frame = picam2.capture_array()
+    lane_frame, lane_center, detected_center = detect_lanes(frame)
+    error = lane_center - detected_center
+    if error > 20:  
+        throttle = 100
+        steering = 50  
+    elif error < -20:
+        throttle = 100
+        steering = -50
+    else:
+        throttle = 100
+        steering = 0
 
-        cv2.imshow("Lane Detection", lane_frame)
-        print(f"Lane Error: {error}")
+    cv2.imshow("Lane Detection", lane_frame)
+    print(f"Lane Error: {error}")
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-        time.sleep(0.1)
-        i = i + 1
-    picam2.stop()
-    cv2.destroyAllWindows()
-
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+    time.sleep(0.1)
     return throttle, steering  # FIX 1: Was using set syntax {throttle, steering}
 
 
@@ -207,6 +199,8 @@ steering = 0
 
 def main():
     update_controls(0,0)
+    picam2 = Picamera2()
+    picam2.start()
     sleep(2)
     device = get_ir_device()
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
@@ -269,6 +263,8 @@ def main():
 
             elif mode.value == 13:  # Pound sign
                 print("Shutting down")
+                picam2.stop()
+                cv2.destroyAllWindows()
                 update_controls(0, 0)
                 update_display("Shutdown", 0, 0)
                 sys.exit()

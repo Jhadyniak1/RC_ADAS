@@ -23,9 +23,9 @@ Adafruit_DCMotor *rightFront = AFMS.getMotor(3);   // M3
 Adafruit_DCMotor *rightRear  = AFMS.getMotor(4);   // M4
 
 // ── Speed constants (0–255) ───────────────────────────────────
-const uint8_t BASE_SPEED  = 180;   // default drive speed
-const uint8_t TURN_SPEED  = 150;   // inner wheel speed while turning
-const uint8_t PIVOT_SPEED = 160;   // speed used for point turns
+const uint8_t BASE_SPEED  = 100;   // default drive speed
+const uint8_t TURN_SPEED  = 100;   // inner wheel speed while turning
+const uint8_t PIVOT_SPEED = 100;   // speed used for point turns
 
 // ─────────────────────────────────────────────────────────────
 //  Low-level helpers
@@ -55,66 +55,6 @@ void releaseAll() {
   rightRear->run(RELEASE);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  High-level movement functions
-// ─────────────────────────────────────────────────────────────
-
-/**
- * Drive straight forward.
- * @param speed  0–255
- */
-void driveForward(uint8_t speed = BASE_SPEED) {
-  setLeft(speed, FORWARD);
-  setRight(speed, FORWARD);
-}
-
-/**
- * Drive straight backward.
- * @param speed  0–255
- */
-void driveBackward(uint8_t speed = BASE_SPEED) {
-  setLeft(speed, BACKWARD);
-  setRight(speed, BACKWARD);
-}
-
-/**
- * Gradual left turn while moving forward.
- * The right side drives at full speed; the left side is slowed.
- * @param outerSpeed  Speed of the faster (right) side
- * @param innerSpeed  Speed of the slower (left) side — use 0 to pivot on left wheels
- */
-void turnLeft(uint8_t outerSpeed = BASE_SPEED, uint8_t innerSpeed = TURN_SPEED) {
-  setLeft(innerSpeed, FORWARD);
-  setRight(outerSpeed, FORWARD);
-}
-
-/**
- * Gradual right turn while moving forward.
- * The left side drives at full speed; the right side is slowed.
- */
-void turnRight(uint8_t outerSpeed = BASE_SPEED, uint8_t innerSpeed = TURN_SPEED) {
-  setLeft(outerSpeed, FORWARD);
-  setRight(innerSpeed, FORWARD);
-}
-
-/**
- * Pivot (point-turn) left in place.
- * Left wheels reverse, right wheels forward.
- */
-void pivotLeft(uint8_t speed = PIVOT_SPEED) {
-  setLeft(speed, BACKWARD);
-  setRight(speed, FORWARD);
-}
-
-/**
- * Pivot (point-turn) right in place.
- * Right wheels reverse, left wheels forward.
- */
-void pivotRight(uint8_t speed = PIVOT_SPEED) {
-  setLeft(speed, FORWARD);
-  setRight(speed, BACKWARD);
-}
-
 /**
  * Stop all motors (coast).
  */
@@ -136,14 +76,9 @@ void brakeAll() {
 //  Mixer — steer with a single throttle + steering value
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Mixed drive: combine throttle and steering into left/right speeds.
- *
  * @param throttle  -255 (full reverse) to +255 (full forward)
  * @param steering  -255 (full left)    to +255 (full right)
- *
- * Example sources: joystick, RC receiver, serial commands, etc.
- */
+
 void drive(int throttle, int steering) {
   // Mix
   int leftSpeed  = throttle + steering;
@@ -168,29 +103,14 @@ void drive(int throttle, int steering) {
   }
 }
 
-
-  // ── Example: use the mixer with fixed values ──
-  // drive(200, -100);  // forward + steer left
-  // delay(1000);
-  // drive(0, 0);       // stop
-
-
-
 void setup() {
 Serial.begin(9600);
-Serial.println("4WD Motor Shield v2 — Starting...");
-
-if (!AFMS.begin()) {
-Serial.println("ERROR: Motor Shield not found. Check wiring/I2C address.");
-delay(1000);
-  }
-  Serial.println("Motor Shield OK.");
 }
 
 int throttle = 0;
 int steering = 0;
+
 void loop() {
- 
 // If the Pi sends something, read 
 if (Serial.available()) {
 String data = Serial.readStringUntil('\n');  // read until newline
@@ -201,5 +121,4 @@ steering = data.substring(commaIndex + 1).toInt();
   }
 }
 drive(throttle, steering);
-
 }

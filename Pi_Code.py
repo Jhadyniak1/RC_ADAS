@@ -43,7 +43,7 @@ draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
 font = ImageFont.load_default()  ### https://pillow.readthedocs.io/en/stable/reference/ImageFont.html
 #font1 = ImageFont.load("arial.pil")
 
-ser = serial.Serial('/dev/ttyS0', 9600, timeout=1)  #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
+ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)  #'/dev/ttyACM0 if using the actual USB port, /dev/ttyS0 for wires'
 
 # returns path of gpio ir receiver device
 def get_ir_device():
@@ -193,9 +193,30 @@ def lane_keep(device):
 def object_avoidance():
     return throttle, steering
 
+def object_detection(device):
+    fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
+    while get_last_event(device) is None:
+        frame = picam2.capture_array()
+        fgmask = fgbg.apply(frame)
+        # Noise cleanup
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
+        contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-def object_detection():
-    return throttle, steering
+        obstacle_detected = False
+        for c in contours:
+            if cv2.contourArea(c) > 2000:  # filter small noise
+                x, y, w, h = cv2.boundingRect(c)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 0, 255), 2)
+                obstacle_detected = True
+
+        throttle = 0 if obstacle_detected else 100
+        steering = 0
+        update_controls(throttle, steering)
+        update_display("Object Detection", throttle, steering)
+        cv2.imshow("Object Detection", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
 
 def adaptive_cruise():
@@ -245,22 +266,22 @@ def main():
                 mode_message = "Adaptive cruise"
 
             elif mode.value == 24:  # Up key
-                throttle = 50
+                throttle = 100
                 steering = 0
                 mode_message = "Drive forward"
 
             elif mode.value == 82:  # Down key
-                throttle = -50
+                throttle = -100
                 steering = 0
                 mode_message = "Drive back"
 
             elif mode.value == 8:  # Left key
-                throttle = 50
+                throttle = 100
                 steering = -50
                 mode_message = "Steer left"
 
             elif mode.value == 90:  # Right key
-                throttle = 50
+                throttle = 100
                 steering = 50  
                 mode_message = "Steer right"
 

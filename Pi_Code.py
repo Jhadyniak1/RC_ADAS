@@ -162,27 +162,32 @@ picam2.configure(config)
 picam2.start()
 sleep(2)
 # need to add dynamic steering not step steering
-def lane_keep():
-    throttle = 0  # initialise with safe defaults
-    steering = 0
-    frame = picam2.capture_array()
-    lane_frame, lane_center, detected_center = detect_lanes(frame)
-    error = lane_center - detected_center
-    if error > 20:  
-        throttle = 100
-        steering = 50  
-    elif error < -20:
-        throttle = 100
-        steering = -50
-    else:
-        throttle = 100
+def lane_keep(device):
+    while get_last_event(device) is None:
+        throttle = 0  # initialise with safe defaults
         steering = 0
+        frame = picam2.capture_array()
+        lane_frame, lane_center, detected_center = detect_lanes(frame)
+        error = lane_center - detected_center
+        if error > 20:
+            throttle = 100
+            steering = 50
+        elif error < -20:
+            throttle = 100
+            steering = -50
+        else:
+            throttle = 100
+            steering = 0
 
-    cv2.imshow("Lane Detection", lane_frame)
-    print(f"Lane Error: {error}")
+        update_controls(throttle, steering)
+        update_display("Lane keep", throttle, steering)
+        cv2.imshow("Lane Detection", lane_frame)
+        print(f"Lane Error: {error}")
 
-    sleep(0.2)
-    return throttle, steering, frame  
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+        sleep(0.2)
 
 
 def object_avoidance():
@@ -221,12 +226,9 @@ def main():
             mode_message = "Unknown"  # FIX 5: Initialise mode_message before the if/elif chain
 
             if mode.value == 69:  # Lane keep (key number 1)
-                throttle, steering, frame = lane_keep()  #
                 print("Lane keep mode")
                 mode_message = "Lane keep"
-                cv2.imshow("Lane keep", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                lane_keep(device)
 
             elif mode.value == 70:  # Object avoidance (key number 2)
                 throttle, steering = object_avoidance() 
@@ -290,4 +292,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

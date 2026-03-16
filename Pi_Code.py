@@ -4,6 +4,19 @@
 #sudo ir-keytable -t (to test)
 #!/usr/bin/python
 
+
+'''
+To use docker:
+t=ultralytics/ultralytics:latest-arm64
+sudo docker pull $t && sudo docker run -it --ipc=host $t
+Without docker: 
+sudo apt update
+sudo apt install python3-pip -y
+pip install -U pip
+pip install ultralytics[export]
+sudo reboot
+'''
+
 import sys  
 import evdev
 from time import sleep
@@ -21,6 +34,14 @@ from picamera2 import Picamera2
 import numpy as np
 import cv2
 import RPi.GPIO as GPIO
+#image processing / object detection stuff
+from ultralytics import YOLO
+# Load a YOLO26n PyTorch model
+model = YOLO("yolo26n.pt")
+# Export the model to NCNN format
+model.export(format="ncnn")  # creates 'yolo26n_ncnn_model'
+# Load the exported NCNN model
+ncnn_model = YOLO("yolo26n_ncnn_model")
 
 WIDTH = 128
 HEIGHT = 64  
@@ -198,6 +219,9 @@ def object_detection(device):
     while get_last_event(device) is None:
         frame = picam2.capture_array()
         fgmask = fgbg.apply(frame)
+        # Run inference
+        results = ncnn_model(frame) # or maybe fgmask is better?
+    '''    
         # Noise cleanup
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)
@@ -212,6 +236,7 @@ def object_detection(device):
 
         throttle = 0 if obstacle_detected else 100
         steering = 0
+        '''
         update_controls(throttle, steering)
         update_display("Object Detection", throttle, steering)
         cv2.imshow("Object Detection", frame)

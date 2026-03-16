@@ -38,11 +38,11 @@ import RPi.GPIO as GPIO
 from ultralytics import YOLO
 # Load a YOLO26n PyTorch model
 model = YOLO("yolo26n.pt")
-# Export the model to NCNN format
+'''# Export the model to NCNN format
 model.export(format="ncnn")  # creates 'yolo26n_ncnn_model'
 # Load the exported NCNN model
 ncnn_model = YOLO("yolo26n_ncnn_model")
-
+'''
 WIDTH = 128
 HEIGHT = 64  
 BORDER = 5
@@ -175,13 +175,7 @@ def detect_lanes(frame):
     right_center = np.mean(right_lane) if right_lane else None
     detected_center = int((left_center + right_center) / 2) if left_center and right_center else lane_center
     return frame, lane_center, detected_center
-picam2 = Picamera2()
-config = picam2.create_preview_configuration(
-    main={"size": (640, 480), "format": "RGB888"}
-)
-picam2.configure(config)
-picam2.start()
-sleep(2)
+
 # need to add dynamic steering not step steering
 def lane_keep(device):
     while get_last_event(device) is None:
@@ -220,7 +214,9 @@ def object_detection(device):
         frame = picam2.capture_array()
         fgmask = fgbg.apply(frame)
         # Run inference
-        results = ncnn_model(frame) # or maybe fgmask is better?
+        results = model(frame) # or maybe fgmask is better?
+        annotated_frame = results[0].plot()
+        cv2.imshow("Camera", annotated_frame)
     '''    
         # Noise cleanup
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -251,12 +247,16 @@ def adaptive_cruise():
 throttle = 0
 steering = 0
 
-
+picam2 = Picamera2()
+config = picam2.create_preview_configuration(
+    main={"size": (1280, 720), "format": "RGB888"} 
+) #was previously {"size": (640, 480), "format": "RGB888"}
+picam2.preview_configuration.align()
+picam2.configure(config)
+picam2.start()
+sleep(2)
 def main():
     update_controls(0,0)
-    #picam2 = Picamera2()
-   # picam2.start()
-    sleep(2)
     device = get_ir_device()
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
     text = "Waiting for input....."

@@ -197,54 +197,96 @@ class ObjectDetector:
 
     def _run_inference(self, frame_rgb: np.ndarray) -> list:
         """
-        Preprocess frame, run TFLite interpreter, and parse SSD-style outputs.
+        Preprocess frame, run TFLite interpreter, and parse raw SSD outputs.
 
-        Returns list of (label, confidence, bbox) where
-        bbox = (x_min_px, y_min_px, x_max_px, y_max_px).
+        This model produces 2 tensors (no built-in NMS):
+          StatefulPartitionedCall:0  (1, 19206, 4)  – box coords [y_min, x_min, y_max, x_max] normalised
+          StatefulPartitionedCall:1  (1, 19206, 90) – raw logits, one per class per anchor
+
+        Returns list of (label, confidence, bbox) after sigmoid + NMS.
+        bbox = (x_min_px, y_min_px, x_max_px, y_max_px)
         """
         cap_h, cap_w = self.capture_size[1], self.capture_size[0]
         in_h,  in_w  = self.input_size
 
-        # Resize to model input size
+        # --- 1. Preprocess ---
         resized = cv2.resize(frame_rgb, (in_w, in_h))
-
-        # Expand dims: (H, W, 3) → (1, H, W, 3)
         if self._input_dtype == np.uint8:
             input_data = np.expand_dims(resized.astype(np.uint8), axis=0)
         else:
-            # float32 models expect [0, 1] normalisation
             input_data = np.expand_dims(resized.astype(np.float32) / 255.0, axis=0)
 
         self.interpreter.set_tensor(self._input_details[0]["index"], input_data)
         self.interpreter.invoke()
 
-        # EfficientDet-Lite output tensors (standard SSD order):
-        #   [0] bounding_boxes  – shape (1, N, 4) – [y_min, x_min, y_max, x_max] normalised
-        #   [1] class_indices   – shape (1, N)
-        #   [2] scores          – shape (1, N)
-        #   [3] num_detections  – shape (1,)
-        boxes   = self.interpreter.get_tensor(self._output_details[0]["index"])[0]  # (N, 4)
-        classes = self.interpreter.get_tensor(self._output_details[1]["index"])[0]  # (N,)
-        scores  = self.interpreter.get_tensor(self._output_details[2]["index"])[0]  # (N,)
-        count   = int(self.interpreter.get_tensor(self._output_details[3]["index"])[0])
+        # --- 2. Retrieve tensors by shape (name order is not guaranteed) ---
+        all_tensors = [
+            self.interpreter.get_tensor(d["index"])
+            for d in self._output_details
+        ]
 
+        boxes_raw  = None   # (19206, 4)
+        scores_raw = None   # (19206, 90)
+
+        for t in all_tensors:
+            if t.ndim == 3 and t.shape[2] == 4:
+                boxes_raw = t[0]       # (N, 4)
+            elif t.ndim == 3 and t.shape[2] > 4:
+                scores_raw = t[0]      # (N, num_classes)
+
+        if boxes_raw is None or scores_raw is None:
+            print("[ObjectDetector] Warning: could not identify output tensors.")
+            return []
+
+        # --- 3. Sigmoid → probabilities, find best class per anchor ---
+        probs = 1.0 / (1.0 + np.exp(-scores_raw.astype(np.float32)))  # (N, 90)
+
+        best_class_scores = probs.max(axis=1)   # (N,)
+        best_class_ids    = probs.argmax(axis=1) # (N,)
+
+        # --- 4. Pre-filter by confidence threshold ---
+        keep = np.where(best_class_scores >= self.conf_threshold)[0]
+        if len(keep) == 0:
+            return []
+
+        filtered_boxes   = boxes_raw[keep]            # (M, 4)
+        filtered_scores  = best_class_scores[keep]    # (M,)
+        filtered_classes = best_class_ids[keep]       # (M,)
+
+        # --- 5. Convert [y_min, x_min, y_max, x_max] → pixel rects for NMS ---
+        # cv2.dnn.NMSBoxes expects [x, y, w, h] in pixels
+        rects = []
+        for y_min, x_min, y_max, x_max in filtered_boxes:
+            x1 = int(np.clip(x_min * cap_w, 0, cap_w))
+            y1 = int(np.clip(y_min * cap_h, 0, cap_h))
+            x2 = int(np.clip(x_max * cap_w, 0, cap_w))
+            y2 = int(np.clip(y_max * cap_h, 0, cap_h))
+            rects.append([x1, y1, x2 - x1, y2 - y1])   # [x, y, w, h]
+
+        # --- 6. NMS (IoU threshold 0.45) ---
+        nms_indices = cv2.dnn.NMSBoxes(
+            rects,
+            filtered_scores.tolist(),
+            self.conf_threshold,
+            0.45,           # IoU threshold
+        )
+
+        if len(nms_indices) == 0:
+            return []
+
+        # cv2 returns shape (N, 1) in older versions, flat list in newer
+        nms_indices = np.array(nms_indices).flatten()
+
+        # --- 7. Build final detection list ---
         detections = []
-        for i in range(count):
-            score = float(scores[i])
-            if score < self.conf_threshold:
-                continue
-
-            class_id = int(classes[i])
+        for idx in nms_indices[:self.max_detections]:
+            class_id = int(filtered_classes[idx])
+            score    = float(filtered_scores[idx])
             label    = self.labels[class_id] if class_id < len(self.labels) else str(class_id)
 
-            # Convert normalised [y_min, x_min, y_max, x_max] → pixel coords
-            y_min, x_min, y_max, x_max = boxes[i]
-            bbox = (
-                int(x_min * cap_w),
-                int(y_min * cap_h),
-                int(x_max * cap_w),
-                int(y_max * cap_h),
-            )
+            x, y, w, h = rects[idx]
+            bbox = (x, y, x + w, y + h)   # (x_min, y_min, x_max, y_max)
+
             detections.append((label, score, bbox))
 
         return detections

@@ -399,12 +399,19 @@ def object_avoidance():
     return throttle, steering
 ###########################Object detection###############################
 def object_detection(device):
-    fgbg = cv2.createBackgroundSubtractorMOG2(detectShadows=False)
-    while get_last_event(device) is None:
-        frame = picam2.capture_array()
-        fgmask = fgbg.apply(frame)
+    def on_det(label, conf, bbox):
+        print(f"  {label:<20s} {conf:.0%}  {bbox}")
 
-        throttle = 0 if obstacle_detected else 100
+    detector = ObjectDetector(on_detection=on_det)
+    detector.start()
+    while get_last_event(device) is None:
+        frame = detector.get_latest_frame()
+        if frame is not None:
+            cv2.imshow("Object Detection", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+        throttle = 0 
         steering = 0
         
         update_controls(throttle, steering)
@@ -443,7 +450,7 @@ def main():
         if key is not None:
             mode = key
             print("Received command:", mode.value, "\n")
-            mode_message = "Unknown"  # FIX 5: Initialise mode_message before the if/elif chain
+            mode_message = "Unknown"  
 
             if mode.value == 69:  # Lane keep (key number 1)
                 print("Lane keep mode")
@@ -456,12 +463,12 @@ def main():
                 mode_message = "Object Avoidance"
 
             elif mode.value == 71:  # Object detection (key number 3)
-                throttle, steering = object_detection()  
+                throttle, steering, object = object_detection()  
                 print("Object detection mode")
                 mode_message = "Object Detection"
 
             elif mode.value == 68:  # Adaptive cruise (key number 4)
-                throttle, steering = adaptive_cruise()  
+                adaptive_cruise(device)  
                 mode_message = "Adaptive cruise"
 
             elif mode.value == 24:  # Up key

@@ -336,6 +336,12 @@ def adaptive_thresholding(frame):
     binary = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                    cv2.THRESH_BINARY_INV, 11, 2)
     return binary
+def region_of_interest(edges):
+    height, width = edges.shape
+    mask = np.zeros_like(edges)
+    polygon = np.array([[(0, height), (width, height), (width, height // 2), (0, height // 2)]], np.int32)
+    cv2.fillPoly(mask, polygon, 255)
+    return cv2.bitwise_and(edges, mask)
 
 def preprocess_image(frame):
     masked = adaptive_thresholding(frame)
@@ -345,19 +351,29 @@ def preprocess_image(frame):
 
 def detect_lanes(frame):
     edges = preprocess_image(frame)
-    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 20, minLineLength=30, maxLineGap=10)
+    edges = region_of_interest(edges)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold = 50, minLineLength=50, maxLineGap=20)
     lane_center = frame.shape[1] // 2
     left_lane, right_lane = [], []
 
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
-            slope = (y2 - y1) / (x2 - x1) if (x2 - x1) != 0 else 0
-            if slope < -0.2:
-                left_lane.append((x1 + x2) // 2)
+            if (x2 - x1) == 0:
+                continue
+            slope = (y2 - y1) / (x2 - x1)
+            mid_x = (x1 + x2) // 2
+            w = frame.shape[1]
+
+            # Tighter slope range: ignore near-horizontal and near-vertical lines
+            if not (0.4 < abs(slope) < 2.5):
+                continue
+        
+            if slope < 0 and mid_x < w * 0.6:   # left lane: negative slope, left 60%
+                left_lane.append(mid_x)
                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
-            elif slope > 0.2:
-                right_lane.append((x1 + x2) // 2)
+            elif slope > 0 and mid_x > w * 0.4:  # right lane: positive slope, right 60%
+                right_lane.append(mid_x)
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
 
     left_center = np.mean(left_lane) if left_lane else None

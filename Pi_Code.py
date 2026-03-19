@@ -412,6 +412,8 @@ def lane_keep(device):
 
 ##########################Object avoidance function############################
 def object_avoidance():
+    throttle = 0
+    steering = 0
     return throttle, steering
 ###########################Object detection###############################
 def object_detection(device):
@@ -441,8 +443,7 @@ def adaptive_cruise():
     return throttle, steering
 
 ###############Project initializations for main script###########################
-throttle = 0
-steering = 0
+
 picam2 = Picamera2()
 config = picam2.create_preview_configuration(
     main={"size": (1280, 720), "format": "RGB888"} 
@@ -453,7 +454,10 @@ picam2.start()
 sleep(2)
 ##################Main loop execution###############################
 def main():
-    update_controls(0,0)
+    throttle = 0
+    steering = 0
+    mode_message = "Unknown"  
+    update_controls(throttle,steering)
     device = get_ir_device()
     draw.rectangle((0, 0, oled.width, oled.height), outline=0, fill=0)
     text = "Waiting for input....."
@@ -466,7 +470,7 @@ def main():
         if key is not None:
             mode = key
             print("Received command:", mode.value, "\n")
-            mode_message = "Unknown"  
+            
 
             if mode.value == 69:  # Lane keep (key number 1)
                 print("Lane keep mode")
@@ -479,7 +483,7 @@ def main():
                 mode_message = "Object Avoidance"
 
             elif mode.value == 71:  # Object detection (key number 3)
-                throttle, steering, object = object_detection()  
+                throttle, steering, object = object_detection(device)  
                 print("Object detection mode")
                 mode_message = "Object Detection"
 

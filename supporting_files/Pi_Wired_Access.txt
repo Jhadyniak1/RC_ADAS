@@ -6,4 +6,4 @@ To access the raspberry pi 4 on the RC car, since it does not have a display it 
 2. Go to your settings -> network and internet -> ethernet -> edit Ip assignent to manual and set it as: IPv4, IP: 192.168.50.20, subnet: 255.255.255.0
 3. On RealVNC Viewer access "192.168.50.10" 
 4. It will prompt for username and password. User: raspi, PW: pie
-5. Youre in
+5. You are now logged in and can login to your local wifi if you want to remove the ethernet cable

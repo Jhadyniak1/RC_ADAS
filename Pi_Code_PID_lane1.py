@@ -359,27 +359,63 @@ def detect_lanes(frame):
 
 
 def lane_keep(device, picam2):
-    Kp = 3
-    flush_ir_events(device)
-    while get_last_event(device) is None:
-        frame                            = picam2.capture_array()
-        frame_bgr                        = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        lane_frame, lane_center, detected_center = detect_lanes(frame_bgr)
+Kp = 0.8
+Ki = 0.02
+Kd = 0.1
+integral = 0
+prev_error = 0
+prev_time = time.time()
+smoothed_center = None
+alpha = 0.2
 
-        error    = lane_center - detected_center
-        throttle = 100
-        steering = int(Kp * error) if abs(error) > 10 else 0
+while get_last_event(device) is None:
+    now = time.time() #need to verify this makes sense
+    dt = now - prev_time
+    prev_time = now
 
-        update_controls(throttle, steering)
-        update_display("Lane keep", throttle, steering)
+    frame = picam2.capture_array()
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    lane_frame, lane_center, detected_center = detect_lanes(frame_bgr)
+
+    if detected_center is None:
+        update_controls(0, 0)
+        continue
+
+    if smoothed_center is None:
+        smoothed_center = detected_center
+    else:
+        smoothed_center = alpha * detected_center + (1 - alpha) * smoothed_center
+
+    error = lane_center - smoothed_center
+
+    integral += error * dt
+    integral = max(min(integral, 100), -100)
+
+    derivative = (error - prev_error) / dt if dt > 0 else 0
+    prev_error = error
+
+    steering = Kp * error + Ki * integral + Kd * derivative
+    steering = int(max(min(steering, 100), -100))
+
+    # Adaptive speed
+    base_speed = 80
+    min_speed = 40
+    turn_factor = abs(steering) / 100.0
+    throttle = int(base_speed * (1 - 0.7 * turn_factor))
+    throttle = max(throttle, min_speed)
+
+    update_controls(throttle, steering)
+    update_display("Lane keep", throttle, steering)
         cv2.imshow("Lane Detection", lane_frame)
         print(f"Lane Error: {error}")
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        sleep(0.05)
+
+        sleep(0.05)   # ~20 Hz
 
     cv2.destroyWindow("Lane Detection")
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

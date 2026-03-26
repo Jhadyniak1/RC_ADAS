@@ -528,8 +528,62 @@ def object_avoidance(device):
 
 def adaptive_cruise(device):
     flush_ir_events(device)
-    # TODO: implement
-    pass
+    
+    TRIG = 23
+    ECHO = 24
+
+    GPIO.setup(TRIG, GPIO.OUT)
+    GPIO.setup(ECHO, GPIO.IN)
+
+    def get_distance_in():
+        GPIO.output(TRIG, False)
+        time.sleep(0.0002)
+
+        GPIO.output(TRIG, True)
+        time.sleep(0.00001)
+        GPIO.output(TRIG, False)
+
+        pulse_start = time.time()
+        pulse_end   = time.time()
+
+        while GPIO.input(ECHO) == 0:
+            pulse_start = time.time()
+
+        while GPIO.input(ECHO) == 1:
+            pulse_end = time.time()
+
+        pulse_duration = pulse_end - pulse_start
+        distance_cm = pulse_duration * 17150
+        distance_in = distance_cm / 2.54
+        return round(distance_in, 2) #I like displaying and working with inches
+
+    print("Adaptive Cruise Control ACTIVE")
+
+    try:
+        while get_last_event(device) is None:
+            dist = get_distance_in()
+            if dist < 2: #right now this stops below 2 inches and peaks at 20 inches, we can adjust if needed
+                speed = 0
+            elif dist > 20:
+                speed = 255
+            else:
+                speed = int((dist - 2) * (255 / 18))
+
+            throttle = speed
+            steering = 0
+
+            update_controls(throttle, steering)
+            update_display("Adaptive Cruise", throttle, steering)
+
+            print(f"Distance: {dist} in | Throttle: {throttle}")
+
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        pass
+
+    print("Exiting Adaptive Cruise Control")
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

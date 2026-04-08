@@ -312,7 +312,13 @@ def adaptive_thresholding(frame):
 def region_of_interest(edges):
     h, w = edges.shape
     mask = np.zeros_like(edges)
-    poly = np.array([[(0, h), (w, h), (w, h // 2), (0, h // 2)]], np.int32)
+    # Trapezoid: wide at bottom, narrow at horizon — better for road perspective
+    poly = np.array([[
+        (int(w * 0.05), h),
+        (int(w * 0.95), h),
+        (int(w * 0.60), int(h * 0.55)),
+        (int(w * 0.40), int(h * 0.55)),
+    ]], np.int32)
     cv2.fillPoly(mask, poly, 255)
     return cv2.bitwise_and(edges, mask)
 
@@ -324,12 +330,23 @@ def preprocess_image(frame):
     return region_of_interest(edges)
 
 
+LANE_HALF_WIDTH = 200  # estimated half-lane width in pixels (640-wide image)
+
+
+def extrapolate_x(x1, y1, x2, y2, target_y):
+    """Return the x-coordinate of the line at target_y via linear extrapolation."""
+    if x2 == x1:
+        return x1
+    return int(x1 + (target_y - y1) * (x2 - x1) / (y2 - y1))
+
+
 def detect_lanes(frame):
+    h, w        = frame.shape[:2]
     edges       = preprocess_image(frame)
     lines       = cv2.HoughLinesP(edges, 1, np.pi / 180,
-                                  threshold=50, minLineLength=50, maxLineGap=20)
-    lane_center = frame.shape[1] // 2
-    left_lane, right_lane = [], []
+                                  threshold=40, minLineLength=40, maxLineGap=30)
+    lane_center = w // 2
+    left_xs, right_xs = [], []
 
     if lines is not None:
         for line in lines:
@@ -338,82 +355,117 @@ def detect_lanes(frame):
                 continue
             slope = (y2 - y1) / (x2 - x1)
             mid_x = (x1 + x2) // 2
-            w     = frame.shape[1]
-            if not (0.4 < abs(slope) < 2.5):
+            if not (0.3 < abs(slope) < 3.0):
                 continue
-            if slope < 0 and mid_x < w * 0.6:
-                left_lane.append(mid_x)
+            # Extrapolate each line to the bottom of the frame for a stable estimate
+            x_bot = extrapolate_x(x1, y1, x2, y2, h)
+            if slope < 0 and mid_x < w * 0.65:        # left lane
+                left_xs.append(x_bot)
                 cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
-            elif slope > 0 and mid_x > w * 0.4:
-                right_lane.append(mid_x)
+            elif slope > 0 and mid_x > w * 0.35:      # right lane
+                right_xs.append(x_bot)
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
 
-    left_center  = np.mean(left_lane)  if left_lane  else None
-    right_center = np.mean(right_lane) if right_lane else None
-    detected_center = (
-        int((left_center + right_center) / 2)
-        if left_center is not None and right_center is not None
-        else lane_center
-    )
+    left_x  = int(np.mean(left_xs))  if left_xs  else None
+    right_x = int(np.mean(right_xs)) if right_xs else None
+
+    if left_x is not None and right_x is not None:
+        detected_center = (left_x + right_x) // 2
+    elif left_x is not None:                           # only left lane visible
+        detected_center = left_x + LANE_HALF_WIDTH
+    elif right_x is not None:                          # only right lane visible
+        detected_center = right_x - LANE_HALF_WIDTH
+    else:
+        detected_center = None                         # no lanes found at all
+
+    # Draw center markers for debugging
+    if detected_center is not None:
+        cv2.circle(frame, (detected_center, h - 10), 8, (0, 0, 255), -1)
+    cv2.circle(frame, (lane_center, h - 10), 6, (255, 255, 0), 2)
+
     return frame, lane_center, detected_center
 
 
 def lane_keep(device, picam2):
-Kp = 0.8
-Ki = 0.02
-Kd = 0.1
-integral = 0
-prev_error = 0
-prev_time = time.time()
-smoothed_center = None
-alpha = 0.2
+    Kp = 1.0
+    Ki = 0.01
+    Kd = 0.15
+    integral   = 0.0
+    prev_error = 0.0
+    prev_time  = time.time()
 
-while get_last_event(device) is None:
-    now = time.time() #need to verify this makes sense
-    dt = now - prev_time
-    prev_time = now
+    smoothed_center = None
+    alpha = 0.5          # faster response than the old 0.2
 
-    frame = picam2.capture_array()
-    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    lane_frame, lane_center, detected_center = detect_lanes(frame_bgr)
+    last_steering    = 0
+    last_throttle    = 50
+    no_lane_frames   = 0
+    MAX_NO_LANE      = 20  # ~1 second at 20 Hz before stopping
 
-    if detected_center is None:
-        update_controls(0, 0)
-        continue
+    base_speed = 70
+    min_speed  = 50
 
-    if smoothed_center is None:
-        smoothed_center = detected_center
-    else:
-        smoothed_center = alpha * detected_center + (1 - alpha) * smoothed_center
+    flush_ir_events(device)
 
-    error = lane_center - smoothed_center
+    while get_last_event(device) is None:
+        now = time.time()
+        dt  = max(now - prev_time, 0.001)   # guard against zero dt
+        prev_time = now
 
-    integral += error * dt
-    integral = max(min(integral, 100), -100)
+        frame     = picam2.capture_array()
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        lane_frame, lane_center, detected_center = detect_lanes(frame_bgr)
 
-    derivative = (error - prev_error) / dt if dt > 0 else 0
-    prev_error = error
+        if detected_center is None:
+            no_lane_frames += 1
+            if no_lane_frames <= MAX_NO_LANE:
+                # Coast with the last known steering at reduced throttle
+                update_controls(int(last_throttle * 0.6), last_steering)
+                update_display("Lane keep", int(last_throttle * 0.6), last_steering)
+            else:
+                update_controls(0, 0)
+                update_display("Lane keep", 0, 0)
+        else:
+            no_lane_frames = 0
 
-    steering = Kp * error + Ki * integral + Kd * derivative
-    steering = int(max(min(steering, 100), -100))
+            if smoothed_center is None:
+                smoothed_center = float(detected_center)
+            else:
+                smoothed_center = alpha * detected_center + (1 - alpha) * smoothed_center
 
-    # Adaptive speed
-    base_speed = 80
-    min_speed = 40
-    turn_factor = abs(steering) / 100.0
-    throttle = int(base_speed * (1 - 0.7 * turn_factor))
-    throttle = max(throttle, min_speed)
+            error = lane_center - smoothed_center
 
-    update_controls(throttle, steering)
-    update_display("Lane keep", throttle, steering)
+            # Reset integral when error crosses zero (prevents fighting the new direction)
+            if prev_error != 0 and (error * prev_error < 0):
+                integral = 0.0
+
+            integral  += error * dt
+            integral   = max(min(integral, 50.0), -50.0)   # tighter anti-windup
+
+            derivative = (error - prev_error) / dt
+            prev_error = error
+
+            steering = Kp * error + Ki * integral + Kd * derivative
+            steering = int(max(min(steering, 100), -100))
+
+            turn_factor = abs(steering) / 100.0
+            throttle    = int(base_speed * (1 - 0.7 * turn_factor))
+            throttle    = max(throttle, min_speed)
+
+            last_steering = steering
+            last_throttle = throttle
+
+            update_controls(throttle, steering)
+            update_display("Lane keep", throttle, steering)
+            print(f"Lane Error: {error:.1f}  Steering: {steering}  Throttle: {throttle}")
+
         cv2.imshow("Lane Detection", lane_frame)
-        print(f"Lane Error: {error}")
-
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
         sleep(0.05)   # ~20 Hz
 
+    update_controls(0, 0)
     cv2.destroyWindow("Lane Detection")
 
 

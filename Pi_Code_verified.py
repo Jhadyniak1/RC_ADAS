@@ -515,8 +515,123 @@ def object_detection(device, picam2):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def object_avoidance(device):
-    # TODO: implement
+   
+    flush_ir_events(device)
+    
+    #GPIO pin config 
+    TRIG_FRONT = 22
+    ECHO_FRONT = 27
+    TRIG_REAR = 25
+    ECHO_REAR = 10
+    
+    #avoidance parameters
+    AVOID_DISTANCE_IN = 36.0  # 3 feet
+    SLOW_DISTANCE_IN = 48.0   # 4 feet
+    BASE_SPEED = 80
+    MIN_SPEED = 30
+    
+    #setup GPIO 
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
+    
+    GPIO.setup(TRIG_FRONT, GPIO.OUT)
+    GPIO.setup(ECHO_FRONT, GPIO.IN)
+    GPIO.setup(TRIG_REAR, GPIO.OUT)
+    GPIO.setup(ECHO_REAR, GPIO.IN)
+    
+    GPIO.output(TRIG_FRONT, False)
+    GPIO.output(TRIG_REAR, False)
+    time.sleep(0.1)
+    
+    def get_distance_in(trig_pin, echo_pin, timeout=0.03):
+        
+        GPIO.output(trig_pin, False)
+        time.sleep(0.0002)
+        GPIO.output(trig_pin, True)
+        time.sleep(0.00001)
+        GPIO.output(trig_pin, False)
+        
+        pulse_start = time.time()
+        timeout_start = pulse_start
+        
+        while GPIO.input(echo_pin) == 0:
+            pulse_start = time.time()
+            if pulse_start - timeout_start > timeout:
+                return 999
+        
+        pulse_end = pulse_start
+        while GPIO.input(echo_pin) == 1:
+            pulse_end = time.time()
+            if pulse_end - pulse_start > timeout:
+                return 999
+        
+        pulse_duration = pulse_end - pulse_start
+        distance_cm = pulse_duration * 17150
+        distance_in = distance_cm / 2.54
+        return round(distance_in, 2)
+    
+    def read_sensors():
+        """Read both sensors."""
+        front = get_distance_in(TRIG_FRONT, ECHO_FRONT)
+        time.sleep(0.01)
+        rear = get_distance_in(TRIG_REAR, ECHO_REAR)
+        return front, rear
+    
+    def compute_avoidance(front, rear, last_turn):
+    
+    # ── Object dangerously close ─────────────────────────
+    if front < 12:  # within 1 foot
+        # Hard right or left turn to avoid collision
+        steering = 80 if last_turn <= 0 else -80
+        throttle = MIN_SPEED  # keep moving forward slowly
+        return (throttle, steering, steering)
+
+    # ── Object nearby (avoidance zone) ───────────────────
+    elif front < AVOID_DISTANCE_IN:
+        # Steer gently away from last direction while continuing forward
+        steering = 50 if last_turn <= 0 else -50
+        throttle = int(BASE_SPEED * 0.6)  # go slower
+        return (throttle, steering, steering)
+
+    # ── Object a bit farther away (slow‑down zone) ───────
+    elif front < SLOW_DISTANCE_IN:
+        # Slightly adjust steering back toward center
+        steering = int(last_turn * 0.5)
+        speed_factor = (front - AVOID_DISTANCE_IN) / (SLOW_DISTANCE_IN - AVOID_DISTANCE_IN)
+        throttle = int(MIN_SPEED + (BASE_SPEED - MIN_SPEED) * speed_factor)
+        return (throttle, steering, steering)
+
+    # ── Clear path ───────────────────────────────────────
+    else:
+        # Straighten out and restore speed
+        return (BASE_SPEED, 0, 0)
+
+    
+    #main loop
+    print("Object Avoidance ACTIVE")
+print(f"Avoidance distance: {AVOID_DISTANCE_IN} inches (3 feet)")
+
+last_turn = 0  # store last steering direction
+
+try:
+    while get_last_event(device) is None:
+        front, rear = read_sensors()
+        throttle, steering, last_turn = compute_avoidance(front, rear, last_turn)
+
+        update_controls(throttle, steering)
+        update_display("Obj Avoid", throttle, steering)
+
+        print(f"Front: {front:5.1f}in | Rear: {rear:5.1f}in | "
+              f"Throttle: {throttle:4d} | Steering: {steering:4d}")
+
+        time.sleep(0.05)  # ~20 Hz refresh
+
+except KeyboardInterrupt:
     pass
+
+finally:
+    update_controls(0, 0)
+    print("Exiting Object Avoidance")
 
 
 def adaptive_cruise(device):

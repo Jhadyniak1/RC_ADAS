@@ -584,71 +584,48 @@ def object_avoidance(device):
         return front, rear
     
     def compute_avoidance(front, rear, last_turn):
-    # Emergency stop: very close
-    if front < AVOID_DISTANCE_IN * 0.5:  # Within 1.5 feet
-        if rear > AVOID_DISTANCE_IN:
-            # Reverse straight back
-            return (-50, 0, last_turn)
-        else:
-            # Boxed in—stop
-            return (0, 0, last_turn)
+    """
+    Determine throttle and steering based on distances.
+    Enables forward obstacle avoidance with steering.
+    """
+    # ── Object dangerously close ─────────────────────────
+    if front < 12:  # within 1 foot
+        # Hard right or left turn to avoid collision
+        steering = 80 if last_turn <= 0 else -80
+        throttle = MIN_SPEED  # keep moving forward slowly
+        return (throttle, steering, steering)
 
-    # Very close but not boxed in: perform avoidance turn
-    if front < 18:   # about 1.5 feet threshold
-        throttle = -40  # small reverse
-        steering = 60 if last_turn <= 0 else -60  # alternate turn direction
-        new_turn = steering
-        return (throttle, steering, new_turn)
+    # ── Object nearby (avoidance zone) ───────────────────
+    elif front < AVOID_DISTANCE_IN:
+        # Steer gently away from last direction while continuing forward
+        steering = 50 if last_turn <= 0 else -50
+        throttle = int(BASE_SPEED * 0.6)  # go slower
+        return (throttle, steering, steering)
 
-    # Object within avoidance range
-    if front < AVOID_DISTANCE_IN:
-        # Slow down and keep last steering bias
-        throttle = MIN_SPEED
-        return (throttle, last_turn, last_turn)
-
-    # Object in slow-down zone
-    if front < SLOW_DISTANCE_IN:
+    # ── Object a bit farther away (slow‑down zone) ───────
+    elif front < SLOW_DISTANCE_IN:
+        # Slightly adjust steering back toward center
+        steering = int(last_turn * 0.5)
         speed_factor = (front - AVOID_DISTANCE_IN) / (SLOW_DISTANCE_IN - AVOID_DISTANCE_IN)
         throttle = int(MIN_SPEED + (BASE_SPEED - MIN_SPEED) * speed_factor)
-        return (throttle, 0, last_turn)
+        return (throttle, steering, steering)
 
-    # Clear path → go straight
-    return (BASE_SPEED, 0, 0)
+    # ── Clear path ───────────────────────────────────────
+    else:
+        # Straighten out and restore speed
+        return (BASE_SPEED, 0, 0)
 
-        
-        # Object within avoidance range
-        if front < AVOID_DISTANCE_IN:
-            return (MIN_SPEED, 0)
-        
-        # Object in slow-down zone
-        if front < SLOW_DISTANCE_IN:
-            speed_factor = (front - AVOID_DISTANCE_IN) / (SLOW_DISTANCE_IN - AVOID_DISTANCE_IN)
-            throttle = int(MIN_SPEED + (BASE_SPEED - MIN_SPEED) * speed_factor)
-            return (throttle, 0)
-        
-        # Clear path
-        return (BASE_SPEED, 0)
     
     #main loop
     print("Object Avoidance ACTIVE")
-    print(f"Avoidance distance: {AVOID_DISTANCE_IN} inches (3 feet)")
-    
-    last_turn = 0  # track last steering direction
+print(f"Avoidance distance: {AVOID_DISTANCE_IN} inches (3 feet)")
+
+last_turn = 0  # store last steering direction
 
 try:
     while get_last_event(device) is None:
         front, rear = read_sensors()
         throttle, steering, last_turn = compute_avoidance(front, rear, last_turn)
-
-        # If turning to avoid obstacle, hold the turn briefly to get clear
-        if abs(steering) >= 50 and throttle < 0:
-            update_controls(throttle, steering)
-            update_display("Avoiding", throttle, steering)
-            print("Avoiding obstacle... turning away")
-            time.sleep(0.4)
-            update_controls(MIN_SPEED, -steering // 2)
-            time.sleep(0.4)
-            last_turn = -steering // 2
 
         update_controls(throttle, steering)
         update_display("Obj Avoid", throttle, steering)
@@ -656,15 +633,15 @@ try:
         print(f"Front: {front:5.1f}in | Rear: {rear:5.1f}in | "
               f"Throttle: {throttle:4d} | Steering: {steering:4d}")
 
-        time.sleep(0.05)
+        time.sleep(0.05)  # ~20 Hz refresh
 
-    
-    except KeyboardInterrupt:
-        pass
-    
-    finally:
-        update_controls(0, 0)
-        print("Exiting Object Avoidance")
+except KeyboardInterrupt:
+    pass
+
+finally:
+    update_controls(0, 0)
+    print("Exiting Object Avoidance")
+
 
 
 def adaptive_cruise(device):
